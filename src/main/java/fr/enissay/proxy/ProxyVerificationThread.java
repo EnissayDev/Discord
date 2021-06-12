@@ -37,12 +37,8 @@ public class ProxyVerificationThread
             HttpClient client = HttpClient.newBuilder().proxy(ProxySelector.of(new InetSocketAddress(proxy.getIp(), proxy.getPort()))).executor(executorService).version(HttpClient.Version.HTTP_1_1).build();
 
             long timeout = 1000L;
-            String encoded = "";
-            if (proxy.getUsername() != null) {
-                encoded = new String(Base64.getEncoder().encode((proxy.getUsername() + ":" + proxy.getUsername()).getBytes()));
-            }
 
-            HttpRequest request = HttpRequest.newBuilder().uri(URI.create("https://httpstat.us/200")).timeout(Duration.ofMillis(timeout)).header("Proxy-Authorization", "Basic " + encoded).GET().build();
+            HttpRequest request = HttpRequest.newBuilder().uri(URI.create("https://httpstat.us/200")).timeout(Duration.ofMillis(timeout)).GET().build();
 
             try {
                 HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());

@@ -5,6 +5,7 @@ import fr.enissay.proxy.Proxy;
 import fr.enissay.proxy.ProxyHandler;
 import fr.enissay.proxy.ProxyVerifier;
 import fr.enissay.proxy.scraper.SourceHandler;
+import fr.enissay.utils.DiscWebhook;
 import org.json.JSONObject;
 import fr.enissay.utils.Logger;
 import fr.enissay.utils.Mode;
@@ -15,7 +16,9 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.sql.Date;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.Base64;
 import java.util.Random;
 import java.util.concurrent.ExecutorService;
@@ -35,27 +38,25 @@ public class RequestRunnable implements Runnable{
 
     @Override
     public void run() {
-        String inputCode = Mode.getString(24, Mode.DISCORD);
+        String inputCode = Mode.getString(DiscordGen.getGeneratorType().getLength(), Mode.DISCORD);
 
         final ExecutorService executor = Executors.newFixedThreadPool(reqAmount);
 
         for (int i = 0; i < reqAmount; i++){
             try {
-                String encoded = "";
+                /*Random random = new Random();
+                int r = random.nextInt(ProxyVerifier.workingProxyList.size());
 
-                Random random = new Random();
-                int r = random.nextInt(ProxyHandler.proxyList.size());
-
-                Proxy proxy = ProxyHandler.proxyList.get(r);
+                Proxy proxy = ProxyVerifier.workingProxyList.get(r);*/
                 HttpClient client = HttpClient.newBuilder()
                         .executor(executor)
-                        .proxy(ProxySelector.of(new InetSocketAddress(proxy.getIp(), proxy.getPort())))
+                        //.proxy(ProxySelector.of(new InetSocketAddress(proxy.getIp(), proxy.getPort())))
                         .version(HttpClient.Version.HTTP_1_1)
                         .build();
 
-                Logger.logDebug("Choosed proxy: " + proxy.toString());
+                //Logger.logDebug("Choosed proxy: " + proxy.toString());
 
-                inputCode = Mode.getString(24, Mode.DISCORD);
+                inputCode = Mode.getString(DiscordGen.getGeneratorType().getLength(), Mode.DISCORD);
 
                 final HttpRequest request = HttpRequest.newBuilder()
                         .uri(URI.create("https://discordapp.com/api/v6/entitlements/gift-codes/" + inputCode))
@@ -67,7 +68,8 @@ public class RequestRunnable implements Runnable{
                 String finalInputCode = inputCode;
                 client.sendAsync(request, HttpResponse.BodyHandlers.ofString())
                         .thenApplyAsync(response -> {
-                            //Logger.logDebug(response.body());
+                            Logger.logInfo(" status: " + response.statusCode());
+                            Logger.logDebug(response.body());
                             final JSONObject obj = new JSONObject(response.body());
 
                             String status = "INVALID";
@@ -94,7 +96,13 @@ public class RequestRunnable implements Runnable{
                                 }
                             }
                             else if (status.equalsIgnoreCase("VALID")) Logger.logSuccess("Got a valid gift code : https://discord.gift/" + finalInputCode + "/" + " @ TRIES: " + DiscordGen.tries + "/" + reqAmount + " @ REMAINING USES: " + (obj.getInt("max_uses") - obj.getInt("uses")) + " @ DESCRIPTION: " + obj.getJSONObject("promotion").getString("inbound_header_text"));
-                            else Logger.logInvalid("Code not working :( | CODE: " + finalInputCode + " @ TRIES: " + DiscordGen.tries + "/" + reqAmount);
+                            else Logger.logInvalid("Code not working :( | CODE: " + "https://discord.gift/" + finalInputCode + "/" + " @ TRIES: " + DiscordGen.tries + "/" + reqAmount);
+
+                            final Request discRequest = new Request(DiscordGen.getGeneratorType(), Date.from(Instant.now()), status, "https://discord.gift/" + finalInputCode + "/");
+                            RequestManager.add(discRequest);
+
+                            new DiscWebhook("https://discordapp.com/api/webhooks/853039663610593301/klElZe20jAdeUjI4s-Fk3kPdjN1mEtNXwhBKz5pQkDUrGIWYOI1hbZYzs2Fk4O60RXae", discRequest);
+
                             if (DiscordGen.tries >= reqAmount) {
                                 final double reqPerSec = 1000 / delay.get();
 

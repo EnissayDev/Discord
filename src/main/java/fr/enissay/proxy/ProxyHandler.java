@@ -21,6 +21,7 @@ import java.util.concurrent.CountDownLatch;
 
 public class ProxyHandler {
     public static ArrayList<Proxy> proxyList = new ArrayList();
+    public static int tries = 0;
 
     public static void loadProxies(boolean verifyProxies) {
         File file = new File("src/main/resources/proxies.txt");
@@ -58,6 +59,7 @@ public class ProxyHandler {
                         Logger.logWarning("Couldn't find any proxies, will not use proxies.");
                     } else {
                         Logger.logWarning("Couldn't find any proxies.");
+                        System.exit(-1);
                     }
 
                     return;
@@ -70,26 +72,31 @@ public class ProxyHandler {
 
                     long diff = instantAfter.getEpochSecond() - instantBefore.getEpochSecond();
                     long cpm = proxyList.size() / (1 * 60L);
+                    proxyList.forEach(proxy -> {
+                        checkProxy(proxy, new CountDownLatch(1));
+                    });
+
                     Logger.logInfo("Time taken: " + (instantAfter.getEpochSecond() - instantBefore.getEpochSecond()) + "s | CPM: " + cpm + " | Hits: " + ProxyVerifier.workingProxyList.size());
                     if (ProxyVerifier.getWorkingProxyList().isEmpty()) {
                         Logger.logError("No working proxies found.");
+                        System.exit(-1);
                     } else {
                         Logger.logSuccess("Found working proxies! Saving them to proxies.txt");
                         File proxySaveFile = new File("src/main/resources/proxies.txt");
-                        String fileName = "proxies.txt";
+                        String fileName = "src/main/resources/proxies.txt";
                         if (proxySaveFile.exists()) {
                             if (!proxySaveFile.delete()) {
                                 Logger.logError("Couldn't delete proxies.txt, saving to workingproxies.txt");
-                                fileName = "workingproxies.txt";
+                                fileName = "src/main/resources/workingproxies.txt";
                             } else {
                                 try {
                                     if (!proxySaveFile.createNewFile()) {
                                         Logger.logError("Couldn't create proxies.txt, saving to workingproxies.txt");
-                                        fileName = "workingproxies.txt";
+                                        fileName = "src/main/resources/workingproxies.txt";
                                     }
                                 } catch (IOException exception) {
                                     Logger.logError("IOexception occurred while creating proxies.txt", exception);
-                                    fileName = "workingproxies.txt";
+                                    fileName = "src/main/resources/workingproxies.txt";
                                 }
                             }
                         }
@@ -133,26 +140,29 @@ public class ProxyHandler {
     public static void checkProxy(Proxy proxy, CountDownLatch countDownLatch) {
         HttpClient client = HttpClient.newBuilder().proxy(ProxySelector.of(new InetSocketAddress(proxy.getIp(), proxy.getPort()))).version(HttpClient.Version.HTTP_1_1).build();
 
-        long timeout = 1000L;
+        long timeout = ProxySettings.getTimeout();
         String encoded = "";
         if (proxy.getUsername() != null) {
             encoded = new String(Base64.getEncoder().encode((proxy.getUsername() + ":" + proxy.getUsername()).getBytes()));
         }
-
         HttpRequest request = HttpRequest.newBuilder().uri(URI.create("https://httpstat.us/200")).timeout(Duration.ofMillis(timeout)).header("Proxy-Authorization", "Basic " + encoded).GET().build();
 
         try {
             HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
             if (response.statusCode() == 200) {
-                Logger.logSuccess("Good proxy! " + proxy.getIp() + ":" + proxy.getPort());
+                tries++;
                 ProxyVerifier.workingProxyList.add(proxy);
+                Logger.logSuccess("Good proxy! " + proxy.getIp() + ":" + proxy.getPort() + " @ " + tries + "/" + proxyList.size() + " (" + ProxyVerifier.workingProxyList.size() + " WORKING)");
             } else {
-                Logger.logError("Bad proxy. " + proxy.getIp() + ":" + proxy.getPort());
+                tries++;
+                Logger.logError("Bad proxy. " + proxy.getIp() + ":" + proxy.getPort() + " @ " + tries + "/" + proxyList.size() + " (" + ProxyVerifier.workingProxyList.size() + " WORKING)");
             }
             countDownLatch.countDown();
         } catch (IOException|InterruptedException exception) {
-            Logger.logError("Bad proxy. " + proxy.getIp() + ":" + proxy.getPort());
+            tries++;
+            Logger.logError("Bad proxy + Error. " + proxy.getIp() + ":" + proxy.getPort() + " @ " + tries + "/" + proxyList.size() + " (" + ProxyVerifier.workingProxyList.size() + " WORKING)");
             countDownLatch.countDown();
+            //exception.printStackTrace();
         }
     }
 }

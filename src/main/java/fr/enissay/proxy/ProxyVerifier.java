@@ -52,6 +52,7 @@ public class ProxyVerifier
                 ArrayList<Proxy> proxyArrayList = new ArrayList<Proxy>(ProxyHandler.proxyList.subList(begin, end));
                 ProxyVerificationThread proxyVerificationThread = new ProxyVerificationThread(proxyArrayList, countDownLatch);
                 checkerThreads.add(proxyVerificationThread);
+
             }
             try {
                 executor.setMaximumPoolSize(ProxySettings.getThreads());

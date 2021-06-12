@@ -1,1 +1,1 @@
-https://github.com/clarketm/proxy-list/blob/master/proxy-list-raw.txt
+https://api.proxyscrape.com/?request=displayproxies&proxytype=http&timeout=1500&ssl=yes
